@@ -9,20 +9,23 @@
 
 using namespace std;
 
+// Class representing a data point with features and assigned cluster ID
 class Point {
   public:
-    vector<double> features;
-    int cluster_id;
+    vector<double> features;  // Feature vector
+    int cluster_id;           // Assigned cluster index
 
     Point(const vector<double> &f) : features(f), cluster_id(-1) {}
 };
 
+// KMeans clustering implementation
 class KMeans {
   private:
-    int k;
-    int max_iters;
-    vector<vector<double>> centroids;
+    int k;                             // Number of clusters
+    int max_iters;                     // Maximum number of iterations
+    vector<vector<double>> centroids; // Centroids of clusters
 
+    // Calculate Euclidean distance between two feature vectors
     double euclideanDistance(const vector<double> &a, const vector<double> &b) {
       double sum = 0.0;
       for (size_t i = 0; i < a.size(); ++i)
@@ -30,6 +33,7 @@ class KMeans {
       return sqrt(sum);
     }
 
+    // Assign each point to the closest centroid's cluster
     void assignClusters(vector<Point> &points) {
       for (auto &point : points) {
         double min_dist = numeric_limits<double>::max();
@@ -45,6 +49,7 @@ class KMeans {
       }
     }
 
+    // Recalculate centroids as mean of points in each cluster
     void updateCentroids(vector<Point> &points) {
       vector<vector<double>> new_centroids(k, vector<double>(points[0].features.size(), 0.0));
       vector<int> counts(k, 0);
@@ -56,40 +61,48 @@ class KMeans {
       }
 
       for (int i = 0; i < k; ++i) {
-        if (counts[i] == 0) continue;
-        for (size_t j = 0; j < new_centroids[i].size(); ++j) new_centroids[i][j] /= counts[i];
+        if (counts[i] == 0) continue; // Avoid division by zero
+        for (size_t j = 0; j < new_centroids[i].size(); ++j) 
+          new_centroids[i][j] /= counts[i];
       }
 
       centroids = new_centroids;
     }
 
   public:
+    // Constructor to initialize k and maximum iterations
     KMeans(int k, int max_iters) : k(k), max_iters(max_iters) {}
-    
+
+    // Getter for centroids after training
     const vector<vector<double>>& getCentroids() const { return centroids; }
 
+    // Run the KMeans clustering algorithm on the dataset
     void fit(vector<Point> &points) {
       centroids.clear();
       srand(time(0));
+      // Initialize centroids randomly from points
       for (int i = 0; i < k; ++i) {
         int index = rand() % points.size();
         centroids.push_back(points[index].features);
       }
 
+      // Main iterative loop
       for (int iter = 0; iter < max_iters; ++iter) {
         assignClusters(points);
 
         vector<vector<double>> old_centroids = centroids;
         updateCentroids(points);
 
+        // Compute total centroid movement to check for convergence
         double change = 0.0;
         for (int i = 0; i < k; ++i)
             change += euclideanDistance(old_centroids[i], centroids[i]);
 
-        if (change < 1e-4) break;
+        if (change < 1e-4) break; // Stop if centroids stabilize
       }
     }
 
+    // Print clustering results and statistics to console
     void printResults(const vector<Point> &points) {
       vector<int> cluster_counts(k, 0);
 
@@ -100,14 +113,14 @@ class KMeans {
         cout << endl;
       }
 
-      cout << "\n--- Resumen por Clúster ---\n";
+      cout << "\n--- Summary by Cluster ---\n";
       for (int i = 0; i < k; ++i) {
-        cout << "Clúster " << i << ": " << cluster_counts[i] << " elementos\n";
+        cout << "Cluster " << i << ": " << cluster_counts[i] << " elements\n";
       }
 
-      cout << "\n--- Centroides Finales ---\n";
+      cout << "\n--- Final Centroids ---\n";
       for (int i = 0; i < k; ++i) {
-        cout << "Clúster " << i << " centroide: ";
+        cout << "Cluster " << i << " centroid: ";
         for (double val : centroids[i])
           cout << val << " ";
         cout << endl;
@@ -115,6 +128,7 @@ class KMeans {
     }
 };
 
+// Load data points from a tab-separated file with specific column selection
 vector<Point> loadData(const string &filename) {
   ifstream file(filename);
   string line;
@@ -124,7 +138,7 @@ vector<Point> loadData(const string &filename) {
 
   while (getline(file, line)) {
     if (!header_skipped) {
-      header_skipped = true;
+      header_skipped = true; // Skip header line
       continue;
     }
 
@@ -133,6 +147,7 @@ vector<Point> loadData(const string &filename) {
     vector<double> features;
     int col = 0;
 
+    // Extract selected columns: column 4 and columns 9 to 14 (0-based)
     while (getline(ss, cell, '\t')) {
       if (col == 4 || (col >= 9 && col <= 14)) {
         try {
@@ -140,7 +155,7 @@ vector<Point> loadData(const string &filename) {
           features.push_back(val);
         }
         catch (...) {
-          features.push_back(0.0);
+          features.push_back(0.0); // Use zero if conversion fails
         }
       }
       col++;
@@ -154,6 +169,7 @@ vector<Point> loadData(const string &filename) {
   return data;
 }
 
+// Normalize data features to range [0,1] per feature dimension
 void normalizeData(vector<Point> &data) {
   if (data.empty()) return;
 
@@ -161,6 +177,7 @@ void normalizeData(vector<Point> &data) {
   vector<double> min_vals(dim, numeric_limits<double>::max());
   vector<double> max_vals(dim, numeric_limits<double>::lowest());
 
+  // Find min and max per feature
   for (const auto &p : data) {
     for (size_t i = 0; i < dim; ++i) {
       min_vals[i] = min(min_vals[i], p.features[i]);
@@ -168,13 +185,16 @@ void normalizeData(vector<Point> &data) {
     }
   }
 
+  // Scale features to [0,1]
   for (auto &p : data) {
     for (size_t i = 0; i < dim; ++i) {
-      if (max_vals[i] != min_vals[i]) p.features[i] = (p.features[i] - min_vals[i]) / (max_vals[i] - min_vals[i]);
+      if (max_vals[i] != min_vals[i])
+        p.features[i] = (p.features[i] - min_vals[i]) / (max_vals[i] - min_vals[i]);
     }
   }
 }
 
+// Save points with their cluster assignments to CSV file
 void saveClusters(const vector<Point>& points, const string& filename) {
   ofstream file(filename);
   for (const auto& p : points) {
@@ -185,6 +205,7 @@ void saveClusters(const vector<Point>& points, const string& filename) {
   file.close();
 }
 
+// Save cluster centroids to CSV file
 void saveCentroids(const vector<vector<double>> &centroids, const string &filename) {
   ofstream file(filename);
   for (const auto& centroid : centroids) {
@@ -196,19 +217,26 @@ void saveCentroids(const vector<vector<double>> &centroids, const string &filena
 }
 
 int main() {
+  // Load data from file
   vector<Point> data = loadData("kmeans_cleaned.txt");
   if (data.empty()) {
-    cerr << "No data loaded. Verifica el archivo.\n";
+    cerr << "No data loaded. Check the input file.\n";
     return 1;
   }
+
+  // Normalize feature values
   normalizeData(data);
 
+  // Initialize and run KMeans with 3 clusters and max 100 iterations
   KMeans kmeans(3, 100);
   kmeans.fit(data);
+
+  // Print clustering results
   kmeans.printResults(data);
 
+  // Save clustered data and centroids to files
   saveClusters(data, "clustered_data.csv");
   saveCentroids(kmeans.getCentroids(), "centroids.csv");
-  
+
   return 0;
 }
